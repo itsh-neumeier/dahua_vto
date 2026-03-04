@@ -80,6 +80,9 @@
     "image": {
       "door_snapshot": {
         "name": "Door camera snapshot"
+      },
+      "access_snapshot": {
+        "name": "Access snapshot"
       }
     },
     "lock": {

@@ -80,6 +80,9 @@
     "image": {
       "door_snapshot": {
         "name": "Türkamera Snapshot"
+      },
+      "access_snapshot": {
+        "name": "Zugangs-Snapshot"
       }
     },
     "lock": {

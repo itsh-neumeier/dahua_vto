@@ -3,7 +3,7 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![HA Version](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg)](https://www.home-assistant.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.13.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
+[![Version](https://img.shields.io/badge/Version-1.14.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
 
 > 🇬🇧 English documentation: [README.md](README.md)
 
@@ -39,6 +39,7 @@ Vollständige Home Assistant Integration für **GOLIATH / Dahua VTO** Türsprech
 | `sensor` | Letzter Zugang | Immer |
 | `camera` | Türkamera | Immer (RTSP) |
 | `image` | Türkamera Snapshot | Auto-Update bei Klingeln |
+| `image` | Zugangs-Snapshot | Auto-Update bei gewährtem Zugang (Karte / Fingerabdruck / Gesicht / PIN) |
 
 ### Dienste
 
@@ -66,6 +67,7 @@ Vollständige Home Assistant Integration für **GOLIATH / Dahua VTO** Türsprech
 | `dahua_vto_fingerprint_enrolled` | Fingerabdruck erfolgreich eingelernt |
 | `dahua_vto_fingerprint_failed` | Einlernvorgang fehlgeschlagen / Timeout |
 | `dahua_vto_doorbell_snapshot` | Snapshot bereit nach Klingeln |
+| `dahua_vto_access_snapshot` | Snapshot bereit nach gewährtem Zugang (Karte/Fingerabdruck/Gesicht/PIN) – enthält `user_id`, `user_name`, `card_no`, `method` |
 | `dahua_vto_users_listed` | Benutzerliste abgerufen |
 | `dahua_vto_logs_fetched` | Protokolleinträge via `get_logs`-Dienst abgerufen |
 
@@ -317,6 +319,107 @@ action: dahua_vto.learn_card
 data:
   user_name: "Max Mustermann"
   timeout: 30
+```
+
+---
+
+### 📸 Zugangs-Snapshot
+
+> Diese Automationen nutzen das `dahua_vto_access_snapshot` Bus-Event.
+> Die `entity_id` im Event-Data verweist auf `image.av_vta05_22av2_zugangs_snapshot`,
+> das den aktuellen Snapshot enthält – nutzbar in Push-Benachrichtigungen als Foto.
+
+#### Push-Benachrichtigung mit Foto bei Zugang
+
+```yaml
+alias: "Zugang – Push-Benachrichtigung mit Foto"
+description: "Benachrichtigung mit Snapshot-Foto wenn jemand die Tür öffnet"
+mode: single
+triggers:
+  - trigger: event
+    event_type: dahua_vto_access_snapshot
+conditions: []
+actions:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: "Tür geöffnet – {{ trigger.event.data.user_name }}"
+      message: >
+        Methode: {{ trigger.event.data.method }} um {{ now().strftime('%H:%M') }} Uhr
+      data:
+        image: "/api/image_proxy/{{ trigger.event.data.entity_id }}"
+```
+
+#### Unterschiedliche Meldung je Zugangsart
+
+```yaml
+alias: "Zugang – Benachrichtigung nach Zugangsart (Karte vs. Fingerabdruck)"
+description: "Verschiedene Benachrichtigungstexte für Karte und Fingerabdruck"
+mode: single
+triggers:
+  - trigger: event
+    event_type: dahua_vto_access_snapshot
+conditions: []
+actions:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: >
+        {% if trigger.event.data.method == 'fingerprint' %}
+          🖐️ Fingerabdruck-Zugang
+        {% elif trigger.event.data.method == 'card' %}
+          💳 Karten-Zugang
+        {% else %}
+          🚪 Tür geöffnet
+        {% endif %}
+      message: >
+        {{ trigger.event.data.user_name }} hat die Tür um
+        {{ now().strftime('%H:%M') }} Uhr geöffnet.
+      data:
+        image: "/api/image_proxy/{{ trigger.event.data.entity_id }}"
+```
+
+#### Alarm bei unbekanntem Zugang (kein Benutzername)
+
+```yaml
+alias: "Zugang – Alarm bei unbekanntem Benutzer"
+description: "Alarm wenn die Tür von einer unregistrierten Karte / Fingerabdruck geöffnet wird"
+mode: single
+triggers:
+  - trigger: event
+    event_type: dahua_vto_access_snapshot
+conditions:
+  - condition: template
+    value_template: "{{ trigger.event.data.user_name == '' }}"
+actions:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: "⚠️ Unbekannter Zugang"
+      message: >
+        Die Tür wurde von einer unbekannten Identität geöffnet
+        (Methode: {{ trigger.event.data.method }}).
+      data:
+        image: "/api/image_proxy/{{ trigger.event.data.entity_id }}"
+```
+
+#### Ankunfts-Benachrichtigung für Haushaltsmitglieder
+
+```yaml
+alias: "Zugang – Ankunft Timo / Anna"
+description: "Benachrichtigung wenn ein bestimmtes Haushaltsmitglied nach Hause kommt"
+mode: single
+triggers:
+  - trigger: event
+    event_type: dahua_vto_access_snapshot
+conditions:
+  - condition: template
+    value_template: >
+      {{ trigger.event.data.user_name in ['TimoNeumeier', 'AnnaNeumeier'] }}
+actions:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: "🏠 {{ trigger.event.data.user_name }} ist zu Hause"
+      message: "Tür geöffnet um {{ now().strftime('%H:%M') }} Uhr"
+      data:
+        image: "/api/image_proxy/{{ trigger.event.data.entity_id }}"
 ```
 
 ---
@@ -677,6 +780,7 @@ actions:
 
 | Version | Änderungen |
 |---|---|
+| **1.14.0** | Neue `image`-Entität `zugangs_snapshot`: automatischer Kamera-Snapshot bei jedem gewährten Zugang (Karte/Fingerabdruck/Gesicht/PIN), löst `dahua_vto_access_snapshot` mit `user_id`, `user_name`, `card_no`, `method` aus – nutzbar in Push-Benachrichtigungs-Automationen mit Inline-Foto |
 | **1.13.0** | Geräte-Log-Abruf korrigiert: korrekter RecordFinder-API-Ablauf (`factory.create` → objektbasierte Aufrufe, Record-Typen `AccessControlCardRec` / `VideoTalkLog`). Neuer `log_type`-Parameter für `get_logs` (`access` / `call` / `all`). HAR-Analyse bestätigte 887 Anruf-Logs + 1000 Zugangs-Logs auf dem Gerät. |
 | **1.12.0** | Türöffnungs-Logging: `lock.unlock` und `button.open_door` schreiben jetzt einen expliziten `DoorUnlock`-Eintrag (mit Quelle `lock`/`button`) ins In-Memory-Log – sichtbar in der `get_logs`-Ausgabe |
 | **1.11.0** | Neue Lock-Entität (Türrelais als HA-Schloss, 5 s Auto-Reset), neue Dienste: `call_room`, `stop_call`, `trigger_alarm` (mit Auto-Stop-Dauer), `get_logs` (In-Memory + RPC2-Log, löst `dahua_vto_logs_fetched` aus) |

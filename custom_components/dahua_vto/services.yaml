@@ -1,0 +1,178 @@
+learn_card:
+  name: Karte anlernen
+  description: >
+    Aktiviert den Karten-Lernmodus. Sobald eine RFID-/IC-Karte an den Leser
+    gehalten wird, feuert Home Assistant das Ereignis 'dahua_vto_card_learned'
+    mit der Kartennummer. Optional kann die Karte direkt einem Nutzer zugeordnet
+    und auf dem Gerät gespeichert werden.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional, wenn nur ein Gerät vorhanden).
+      required: false
+      selector:
+        text:
+    user_id:
+      name: Nutzer-ID
+      description: >
+        Numerische ID des Nutzers (z. B. "101"). Wenn angegeben, wird die Karte
+        nach dem Einlesen automatisch diesem Nutzer auf dem Gerät zugewiesen.
+      required: false
+      selector:
+        text:
+    user_name:
+      name: Nutzername
+      description: >
+        Anzeigename des Nutzers (z. B. "Max Mustermann"). Wird ein neuer Nutzer
+        angelegt, wenn die Nutzer-ID noch nicht vorhanden ist.
+      required: false
+      selector:
+        text:
+    timeout:
+      name: Timeout (Sekunden)
+      description: Nach dieser Zeit wird der Lernmodus automatisch beendet.
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 10
+          max: 120
+          step: 5
+          unit_of_measurement: s
+
+stop_learn_card:
+  name: Karten-Lernmodus beenden
+  description: Bricht den laufenden Karten-Lernmodus vorzeitig ab.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+
+add_card:
+  name: Karte manuell hinzufügen
+  description: >
+    Registriert eine RFID-/IC-Karte direkt mit bekannter Kartennummer –
+    ohne physisches Einlesen.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+    card_no:
+      name: Kartennummer
+      description: Die hexadezimale Kartennummer (z. B. "1A2B3C4D").
+      required: true
+      selector:
+        text:
+    user_id:
+      name: Nutzer-ID
+      description: Numerische Nutzer-ID, der die Karte zugeordnet wird.
+      required: true
+      selector:
+        text:
+    user_name:
+      name: Nutzername
+      description: Optional – legt den Nutzer an, falls er noch nicht existiert.
+      required: false
+      selector:
+        text:
+
+delete_card:
+  name: Karte löschen
+  description: Entfernt eine registrierte RFID-/IC-Karte vom Gerät.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+    card_no:
+      name: Kartennummer
+      description: Die zu löschende Kartennummer.
+      required: true
+      selector:
+        text:
+
+enroll_fingerprint:
+  name: Fingerabdruck anlernen
+  description: >
+    Startet den Fingerabdruck-Einlern-Modus auf dem Gerät. Das Display der
+    Türstation fordert den Nutzer auf, den Finger ca. 3× aufzulegen.
+    Nach Abschluss feuert HA das Ereignis 'dahua_vto_fingerprint_enrolled'
+    (Erfolg) oder 'dahua_vto_fingerprint_failed' (Fehler/Timeout).
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+    user_id:
+      name: Nutzer-ID
+      description: Numerische ID des Nutzers (z. B. "101").
+      required: true
+      selector:
+        text:
+    user_name:
+      name: Nutzername
+      description: Optionaler Name – legt den Nutzer auf dem Gerät an, wenn nötig.
+      required: false
+      default: ""
+      selector:
+        text:
+    finger_index:
+      name: Finger-Index
+      description: >
+        Welcher Finger angelegt wird (0 = rechter Zeigefinger, 1–9 = weitere
+        Finger). Standard: 0.
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 9
+          step: 1
+    timeout:
+      name: Timeout (Sekunden)
+      description: >
+        Maximale Wartezeit auf den Abschluss des Einlernens. Nach Ablauf
+        wird der Vorgang abgebrochen.
+      required: false
+      default: 60
+      selector:
+        number:
+          min: 20
+          max: 180
+          step: 10
+          unit_of_measurement: s
+
+cancel_enrollment:
+  name: Einlern-Vorgang abbrechen
+  description: Bricht einen laufenden Fingerabdruck-Einlern-Vorgang ab.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+
+list_users:
+  name: Benutzer auslesen
+  description: >
+    Liest alle registrierten Benutzer vom Gerät aus und feuert das HA-Ereignis
+    'dahua_vto_users_listed' mit einer Liste aller Benutzer (UserID, Name usw.).
+    Nützlich zur Diagnose oder als Grundlage für Automationen.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional, wenn nur ein Gerät vorhanden).
+      required: false
+      selector:
+        text:

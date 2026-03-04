@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up DahuaVTO",
+        "description": "Enter the connection details for your GOLIATH / Dahua door station.",
+        "data": {
+          "host": "IP Address",
+          "port": "Port (default: 80)",
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "confirm": {
+        "title": "Device found – verify modules",
+        "description": "**Device:** {model}  \n**Firmware:** {firmware}  \n\nThe auto-detected modules are pre-filled below. Correct the values if necessary.",
+        "data": {
+          "button_count": "Number of doorbell buttons",
+          "has_fingerprint": "Fingerprint module installed",
+          "has_card_reader": "RFID / card reader installed"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the device. Is the IP address correct and is the device reachable?",
+      "invalid_auth": "Invalid username or password.",
+      "unknown": "Unexpected error. Check the logs for details."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "entity": {
+    "event": {
+      "doorbell": {
+        "name": "Doorbell"
+      },
+      "doorbell_button": {
+        "name": "Doorbell button {number}"
+      },
+      "fingerprint": {
+        "name": "Fingerprint"
+      },
+      "card_access": {
+        "name": "Card access"
+      }
+    },
+    "binary_sensor": {
+      "doorbell": {
+        "name": "Doorbell"
+      },
+      "doorbell_button": {
+        "name": "Doorbell button {number}"
+      },
+      "door_contact": {
+        "name": "Door contact"
+      },
+      "missed_call": {
+        "name": "Missed call"
+      }
+    },
+    "button": {
+      "open_door": {
+        "name": "Open door"
+      }
+    },
+    "sensor": {
+      "last_access": {
+        "name": "Last access"
+      }
+    },
+    "camera": {
+      "door_camera": {
+        "name": "Door camera"
+      }
+    },
+    "image": {
+      "door_snapshot": {
+        "name": "Door camera snapshot"
+      }
+    }
+  }
+}

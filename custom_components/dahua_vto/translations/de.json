@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "DahuaVTO einrichten",
+        "description": "Verbindungsdaten der GOLIATH / Dahua Türsprechanlage eingeben.",
+        "data": {
+          "host": "IP-Adresse",
+          "port": "Port (Standard: 80)",
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      },
+      "confirm": {
+        "title": "Gerät erkannt – Module prüfen",
+        "description": "**Gerät:** {model}  \n**Firmware:** {firmware}  \n\nDie automatisch erkannten Module sind unten vorausgefüllt. Korrigiere die Werte falls nötig.",
+        "data": {
+          "button_count": "Anzahl Klingel-Buttons",
+          "has_fingerprint": "Fingerabdruck-Modul vorhanden",
+          "has_card_reader": "RFID-/Karten-Leser vorhanden"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum Gerät fehlgeschlagen. Ist die IP korrekt und ist das Gerät im Netzwerk erreichbar?",
+      "invalid_auth": "Falscher Benutzername oder falsches Passwort.",
+      "unknown": "Unbekannter Fehler. Prüfe die Protokolle für Details."
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits konfiguriert."
+    }
+  },
+  "entity": {
+    "event": {
+      "doorbell": {
+        "name": "Klingel"
+      },
+      "doorbell_button": {
+        "name": "Klingel Button {number}"
+      },
+      "fingerprint": {
+        "name": "Fingerabdruck"
+      },
+      "card_access": {
+        "name": "Kartenzugang"
+      }
+    },
+    "binary_sensor": {
+      "doorbell": {
+        "name": "Klingel"
+      },
+      "doorbell_button": {
+        "name": "Klingel Button {number}"
+      },
+      "door_contact": {
+        "name": "Türkontakt"
+      },
+      "missed_call": {
+        "name": "Anruf unbeantwortet"
+      }
+    },
+    "button": {
+      "open_door": {
+        "name": "Tür öffnen"
+      }
+    },
+    "sensor": {
+      "last_access": {
+        "name": "Letzter Zugang"
+      }
+    },
+    "camera": {
+      "door_camera": {
+        "name": "Türkamera"
+      }
+    },
+    "image": {
+      "door_snapshot": {
+        "name": "Türkamera Snapshot"
+      }
+    }
+  }
+}

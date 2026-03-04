@@ -114,6 +114,7 @@ SCHEMA_GET_LOGS = vol.Schema(
             vol.Coerce(int), vol.Range(min=1, max=100)
         ),
         vol.Optional("source", default="both"): vol.In(["device", "memory", "both"]),
+        vol.Optional("log_type", default="access"): vol.In(["access", "call", "all"]),
     }
 )
 
@@ -380,6 +381,7 @@ def _register_services(hass: HomeAssistant) -> None:
         await coord.get_logs(
             count=call.data.get("count", 20),
             source=call.data.get("source", "both"),
+            log_type=call.data.get("log_type", "access"),
         )
 
     hass.services.async_register(

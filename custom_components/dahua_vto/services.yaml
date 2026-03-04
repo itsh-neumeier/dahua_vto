@@ -266,6 +266,8 @@ get_logs:
     Gibt die letzten Ereignisse aus. Feuert das HA-Ereignis
     'dahua_vto_logs_fetched' mit allen Einträgen. Quellen: 'device' (Gerät
     via RPC2), 'memory' (HA-interner Puffer) oder 'both' (beide, Standard).
+    Protokolltypen: 'access' (Türöffnungen/Karten), 'call' (Videoanruf-Log),
+    'all' (beide).
   fields:
     entry_id:
       name: Geräte-ID
@@ -294,3 +296,17 @@ get_logs:
             - device
             - memory
             - both
+    log_type:
+      name: Protokolltyp
+      description: >
+        'access' = Türöffnungen & Kartenzugänge (AccessControlCardRec, Standard),
+        'call' = Videoanruf-Protokoll (VideoTalkLog),
+        'all' = beide kombiniert.
+      required: false
+      default: access
+      selector:
+        select:
+          options:
+            - access
+            - call
+            - all

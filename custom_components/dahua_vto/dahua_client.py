@@ -343,11 +343,20 @@ class DahuaClient:
         _LOGGER.debug("RPC2 login successful, session=%s…", str(token)[:8])
         return str(token)
 
-    async def _rpc2_call(self, method: str, params: dict) -> dict:
+    async def _rpc2_call(
+        self, method: str, params: dict, object_id: int | None = None
+    ) -> dict:
         """Make an authenticated RPC2 call.
 
         Auto-logins on first use.  On session-expired error (-401 / 287637505)
         re-logins once and retries.
+
+        Parameters
+        ----------
+        object_id:
+            Optional RPC2 ``object`` field (used by RecordFinder and other
+            factory-created objects).  The HAR shows Dahua firmware expects
+            this as a top-level field alongside ``method``/``params``/``session``.
         """
         if self._rpc2_session is None:
             self._rpc2_session = await self._rpc2_login()
@@ -358,12 +367,14 @@ class DahuaClient:
 
         async def _do_call(sess_token: str) -> dict:
             self._rpc2_id += 1
-            body = {
+            body: dict = {
                 "method": method,
                 "params": params,
                 "id": self._rpc2_id,
                 "session": sess_token,
             }
+            if object_id is not None:
+                body["object"] = object_id
             try:
                 async with session.post(
                     url, json=body, timeout=to, ssl=False
@@ -382,6 +393,101 @@ class DahuaClient:
             result = await _do_call(self._rpc2_session)
 
         return result
+
+    async def _record_finder_query(
+        self, record_type: str, count: int = 20
+    ) -> list[dict]:
+        """Run a full RecordFinder query using the object-based API.
+
+        This matches the exact flow used by the device web UI (confirmed via HAR):
+          1. RecordFinder.factory.create  → object handle
+          2. RecordFinder.startFind       → total record count
+          3. RecordFinder.doFind          → actual records (newest `count` entries)
+          4. RecordFinder.stopFind
+          5. RecordFinder.destroy
+
+        Parameters
+        ----------
+        record_type:
+            One of the device's record type names, e.g.:
+            ``"AccessControlCardRec"`` – access/unlock log
+            ``"VideoTalkLog"``         – call log (VTO ↔ VTH)
+            ``"AlarmRecord"``          – alarm log
+        count:
+            Maximum number of records to return (newest first).
+        """
+        obj_id: int | None = None
+        try:
+            # Step 1 – create object handle
+            create = await self._rpc2_call(
+                "RecordFinder.factory.create", {"name": record_type}
+            )
+            if not create.get("result"):
+                _LOGGER.debug(
+                    "RecordFinder.factory.create(%s) failed: %s", record_type, create
+                )
+                return []
+            obj_id = create.get("params", {}).get("object") or create.get("object")
+            if obj_id is None:
+                _LOGGER.debug(
+                    "RecordFinder.factory.create(%s) returned no object ID", record_type
+                )
+                return []
+
+            # Step 2 – start find (newest first)
+            start = await self._rpc2_call(
+                "RecordFinder.startFind",
+                {"condition": {"Orders": [{"Field": "CreateTime", "Type": "Descent"}]}},
+                object_id=obj_id,
+            )
+            total: int = 0
+            if start.get("result"):
+                total = (start.get("params") or {}).get("total", 0) or (
+                    (start.get("params") or {}).get("Total", 0)
+                )
+
+            if total == 0:
+                # Try getQuerySize as fallback
+                qs = await self._rpc2_call(
+                    "RecordFinder.getQuerySize", {}, object_id=obj_id
+                )
+                total = (qs.get("params") or {}).get("total", 0) or (
+                    (qs.get("params") or {}).get("Total", 0)
+                )
+
+            actual_count = min(count, max(total, count))
+
+            # Step 3 – fetch records
+            do = await self._rpc2_call(
+                "RecordFinder.doFind",
+                {"count": actual_count},
+                object_id=obj_id,
+            )
+            records: list[dict] = []
+            if do.get("result"):
+                p = do.get("params") or {}
+                records = p.get("records") or p.get("Records") or []
+
+            _LOGGER.debug(
+                "_record_finder_query(%s): total=%d fetched=%d",
+                record_type, total, len(records),
+            )
+            return records
+
+        except Exception as exc:
+            _LOGGER.debug("_record_finder_query(%s) error: %s", record_type, exc)
+            return []
+        finally:
+            # Always clean up the object on the device
+            if obj_id is not None:
+                for cleanup_method in (
+                    "RecordFinder.stopFind",
+                    "RecordFinder.destroy",
+                ):
+                    try:
+                        await self._rpc2_call(cleanup_method, {}, object_id=obj_id)
+                    except Exception:
+                        pass
 
     # ------------------------------------------------------------------
     # Discovery / Info API
@@ -778,46 +884,22 @@ class DahuaClient:
             return False
 
     async def get_access_logs(self, count: int = 20) -> list[dict]:
-        """Fetch recent access log entries from the device via RPC2 (best-effort).
+        """Fetch recent access/unlock log entries from the device via RPC2.
 
-        Tries RecordFinder (AccessControlLog) first, then LogServer.getMlogList.
-        Returns an empty list if both fail (coordinator in-memory log is the
-        reliable fallback).
+        Uses the object-based RecordFinder API (confirmed from device HAR):
+          record type ``AccessControlCardRec`` – 1000 records on this device.
+
+        Falls back to LogServer.getMlogList if the RecordFinder fails.
+        Returns an empty list on total failure (coordinator in-memory log is the
+        reliable fallback for HA-initiated unlocks).
         """
-        # --- Attempt 1: RecordFinder for AccessControlLog ------------------
-        try:
-            start = await self._rpc2_call(
-                "RecordFinder.startFind",
-                {"Name": "AccessControlLog", "Condition": {}},
-            )
-            if start.get("result"):
-                token = start["params"]["Token"]
-                total = start["params"].get("Total", 0)
-                records: list[dict] = []
-                try:
-                    offset = max(0, total - count)
-                    do = await self._rpc2_call(
-                        "RecordFinder.doFind",
-                        {"Token": token, "Offset": offset, "Count": count},
-                    )
-                    if do.get("result"):
-                        records = do.get("params", {}).get("Records", [])
-                finally:
-                    try:
-                        await self._rpc2_call(
-                            "RecordFinder.stopFind", {"Token": token}
-                        )
-                    except Exception:
-                        pass
-                if records:
-                    _LOGGER.debug(
-                        "get_access_logs: %d records via RecordFinder", len(records)
-                    )
-                    return records
-        except Exception as exc:
-            _LOGGER.debug("get_access_logs RecordFinder failed: %s", exc)
+        # --- Attempt 1: RecordFinder with correct record type ---------------
+        records = await self._record_finder_query("AccessControlCardRec", count)
+        if records:
+            _LOGGER.debug("get_access_logs: %d records via AccessControlCardRec", len(records))
+            return records
 
-        # --- Attempt 2: LogServer.getMlogList -------------------------------
+        # --- Attempt 2: LogServer.getMlogList (older firmware fallback) -----
         try:
             result = await self._rpc2_call(
                 "LogServer.getMlogList",
@@ -833,6 +915,19 @@ class DahuaClient:
             _LOGGER.debug("get_access_logs LogServer failed: %s", exc)
 
         return []
+
+    async def get_call_logs(self, count: int = 20) -> list[dict]:
+        """Fetch recent call log entries from the device via RPC2.
+
+        Uses the object-based RecordFinder API with record type
+        ``VideoTalkLog`` – confirmed via HAR (887 records on this device).
+
+        Each record contains fields like CallerID, CalleeID, Status, Duration,
+        CreateTime, MediaType etc.
+        """
+        records = await self._record_finder_query("VideoTalkLog", count)
+        _LOGGER.debug("get_call_logs: %d records via VideoTalkLog", len(records))
+        return records
 
     # ------------------------------------------------------------------
     # Event Stream

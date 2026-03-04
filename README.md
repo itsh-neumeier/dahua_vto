@@ -3,7 +3,7 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![HA Version](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg)](https://www.home-assistant.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.12.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
+[![Version](https://img.shields.io/badge/Version-1.13.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
 
 > 🇩🇪 Deutsche Dokumentation: [README.de.md](README.de.md)
 
@@ -677,6 +677,7 @@ actions:
 
 | Version | Changes |
 |---|---|
+| **1.13.0** | Fix device log retrieval: correct RecordFinder API (`factory.create` → object-based calls, record types `AccessControlCardRec` / `VideoTalkLog`). New `log_type` param for `get_logs` service (`access` / `call` / `all`). HAR analysis confirmed 887 call logs + 1000 access logs on device. |
 | **1.12.0** | Door unlock logging: `lock.unlock` and `button.open_door` now write an explicit `DoorUnlock` entry (with source `lock`/`button`) to the in-memory log – visible in `get_logs` output |
 | **1.11.0** | New lock entity (door relay as HA lock, 5 s auto-reset), new services: `call_room`, `stop_call`, `trigger_alarm` (with auto-stop duration), `get_logs` (in-memory + RPC2 log, fires `dahua_vto_logs_fetched`) |
 | **1.10.0** | Fix snapshot (CallNoAnswered in image.py), door contact via Relay=true (8s auto-reset), new "Call active" binary sensor, UserID auto-resolution by name for card/fingerprint services |

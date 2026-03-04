@@ -492,25 +492,33 @@ class DahuaCoordinator:
     # Log retrieval
     # ------------------------------------------------------------------
 
-    async def get_logs(self, count: int = 20, source: str = "both") -> None:
+    async def get_logs(
+        self, count: int = 20, source: str = "both", log_type: str = "access"
+    ) -> None:
         """Fetch logs and fire 'dahua_vto_logs_fetched' on the HA bus.
 
         Parameters
         ----------
-        count:  Number of log entries to return.
-        source: "device"  – device-side RPC2 log only
-                "memory"  – in-memory event log only
-                "both"    – merge device + memory logs (default)
+        count:    Number of log entries to return.
+        source:   "device"  – device-side RPC2 log only
+                  "memory"  – in-memory event log only
+                  "both"    – merge device + memory logs (default)
+        log_type: "access"  – AccessControlCardRec (unlock/access log, default)
+                  "call"    – VideoTalkLog (VTO↔VTH call history)
+                  "all"     – access + call logs merged
         """
         device_records: list[dict] = []
         memory_records: list[dict] = list(self._event_log)[-count:]
 
         if source in ("device", "both"):
             try:
-                device_records = await self.client.get_access_logs(count=count)
+                if log_type in ("access", "all"):
+                    device_records += await self.client.get_access_logs(count=count)
+                if log_type in ("call", "all"):
+                    device_records += await self.client.get_call_logs(count=count)
             except Exception as exc:
                 _LOGGER.debug(
-                    "DahuaVTO [%s]: get_access_logs device query failed: %s",
+                    "DahuaVTO [%s]: device log query failed: %s",
                     self.entry_id, exc,
                 )
 
@@ -519,7 +527,7 @@ class DahuaCoordinator:
         elif source == "memory":
             records = memory_records
         else:
-            # Merge: device records first (older), memory records last (newer)
+            # Merge: device records first, memory records last (newest)
             records = device_records + memory_records
 
         self.hass.bus.async_fire(
@@ -529,11 +537,12 @@ class DahuaCoordinator:
                 "count": len(records),
                 "records": records[-count:],  # cap at requested count
                 "source": source,
+                "log_type": log_type,
             },
         )
         _LOGGER.info(
-            "DahuaVTO [%s]: get_logs fired %d records (source=%s)",
-            self.entry_id, len(records), source,
+            "DahuaVTO [%s]: get_logs fired %d records (source=%s, type=%s)",
+            self.entry_id, len(records), source, log_type,
         )
 
     # ------------------------------------------------------------------

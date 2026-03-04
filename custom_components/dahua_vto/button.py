@@ -67,6 +67,6 @@ class DahuaDoorButton(ButtonEntity):
     async def async_press(self) -> None:
         """Open the door."""
         _LOGGER.info("Opening door via DahuaVTO")
-        success = await self._coordinator.client.open_door()
+        success = await self._coordinator.unlock_door(source="button")
         if not success:
             _LOGGER.warning("Door open command may have failed – check device logs")

@@ -101,7 +101,7 @@ class DahuaDoorLock(LockEntity):
         self._attr_is_locked = False
         self.async_write_ha_state()
 
-        success = await self._coordinator.client.open_door()
+        success = await self._coordinator.unlock_door(source="lock")
         self._attr_is_unlocking = False
 
         if success:

@@ -3,7 +3,7 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![HA Version](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg)](https://www.home-assistant.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.11.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
+[![Version](https://img.shields.io/badge/Version-1.12.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
 
 > 🇬🇧 English documentation: [README.md](README.md)
 
@@ -677,6 +677,7 @@ actions:
 
 | Version | Änderungen |
 |---|---|
+| **1.12.0** | Türöffnungs-Logging: `lock.unlock` und `button.open_door` schreiben jetzt einen expliziten `DoorUnlock`-Eintrag (mit Quelle `lock`/`button`) ins In-Memory-Log – sichtbar in der `get_logs`-Ausgabe |
 | **1.11.0** | Neue Lock-Entität (Türrelais als HA-Schloss, 5 s Auto-Reset), neue Dienste: `call_room`, `stop_call`, `trigger_alarm` (mit Auto-Stop-Dauer), `get_logs` (In-Memory + RPC2-Log, löst `dahua_vto_logs_fetched` aus) |
 | **1.10.0** | Snapshot-Fix (CallNoAnswered in image.py), Türkontakt via Relay=true (8s Auto-Reset), neuer „Im Gespräch"-Binärsensor, automatische UserID-Auflösung per Name für Karten-/Fingerabdruck-Dienste |
 | **1.9.0** | Zweisprachig DE/EN via HA-Übersetzungssystem, HACS-Dokumentation, Sicherheitsverbesserungen (URL-Sanitierung), NumberSelector BOX statt Schieberegler |

@@ -444,6 +444,39 @@ class DahuaCoordinator:
             self._alarm_stop_task = self.hass.async_create_task(_auto_stop())
 
     # ------------------------------------------------------------------
+    # Door unlock (logs the action explicitly)
+    # ------------------------------------------------------------------
+
+    async def unlock_door(self, source: str = "ha") -> bool:
+        """Trigger the door relay and write an entry to the in-memory event log.
+
+        Parameters
+        ----------
+        source: Who initiated the unlock.
+                "lock"   – via the lock entity
+                "button" – via the button entity
+                "ha"     – generic HA-initiated (service call, automation, …)
+        """
+        success = await self.client.open_door()
+        self._event_log.append(
+            {
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "code": "DoorUnlock",
+                "action": "Remote",
+                "index": 0,
+                "data": {"source": source, "success": success},
+                "user_id": 0,
+                "user_name": "HomeAssistant",
+                "card_no": "",
+            }
+        )
+        _LOGGER.info(
+            "DahuaVTO [%s]: unlock_door called (source=%s, success=%s)",
+            self.entry_id, source, success,
+        )
+        return success
+
+    # ------------------------------------------------------------------
     # Call control
     # ------------------------------------------------------------------
 

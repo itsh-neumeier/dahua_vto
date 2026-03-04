@@ -1,9 +1,9 @@
 {
   "domain": "dahua_vto",
   "name": "DahuaVTO",
-  "version": "1.9.0",
-  "documentation": "https://github.com/your-repo/dahua_vto",
-  "issue_tracker": "https://github.com/your-repo/dahua_vto/issues",
+  "version": "1.10.0",
+  "documentation": "https://github.com/itsh-neumeier/dahua_vto",
+  "issue_tracker": "https://github.com/itsh-neumeier/dahua_vto/issues",
   "dependencies": [],
   "codeowners": [],
   "requirements": [],

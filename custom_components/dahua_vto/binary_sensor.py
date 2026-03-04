@@ -21,8 +21,10 @@ from .models import DahuaEvent
 _LOGGER = logging.getLogger(__name__)
 
 # Auto-reset delays
-_DOORBELL_RESET_DELAY  = 5   # 5 seconds – visual "ringing" indicator
-_MISSED_CALL_RESET_DELAY = 60  # 1 minute
+_DOORBELL_RESET_DELAY    = 5    # seconds – visual "ringing" indicator
+_MISSED_CALL_RESET_DELAY = 60   # seconds
+_DOOR_RELAY_RESET_DELAY  = 8    # seconds – door unlock relay pulse (no physical contact)
+_CALL_ACTIVE_RESET_DELAY = 300  # seconds – fallback if VideoTalk Stop is never received
 
 # Doorbell event codes/actions (same as event.py)
 # CallNoAnswered;action=Start is what GOLIATH firmware fires on button press
@@ -46,6 +48,7 @@ async def async_setup_entry(
 
     entities.append(DahuaMissedCallSensor(coordinator, entry.entry_id))
     entities.append(DahuaDoorContactSensor(coordinator, entry.entry_id))
+    entities.append(DahuaCallActiveSensor(coordinator, entry.entry_id))
 
     async_add_entities(entities)
 
@@ -225,17 +228,30 @@ class DahuaDoorContactSensor(DahuaBaseBinarySensor):
                 _LOGGER.info("Door contact: CLOSED")
                 self._turn_off()
             elif event.action == "Pulse":
-                # Some firmware sends action=Pulse with Status inside the JSON data,
-                # e.g.:  data={"Relay":true,"Status":"Close"}
+                # Dahua sends action=Pulse with Relay + Status in the JSON data.
+                # Observed on GOLIATH: data={"Relay":true,"Status":"Close"}
+                # "Relay":true means the door relay just fired (door unlocked).
+                # "Status":"Close" refers to the relay coil state, NOT the door position.
+                # Priority: Relay field wins over Status for open detection.
+                relay  = event.data.get("Relay", False)
                 status = event.data.get("Status", "")
-                if status == "Open":
+                if relay:
+                    # Relay energised = door just unlocked; brief OPEN indicator
+                    _LOGGER.info(
+                        "Door contact: OPEN via relay pulse – auto-reset in %ds",
+                        _DOOR_RELAY_RESET_DELAY,
+                    )
+                    self._attr_is_on = True
+                    self.async_write_ha_state()
+                    self._schedule_reset(_DOOR_RELAY_RESET_DELAY)
+                elif status == "Open":
                     _LOGGER.info("Door contact: OPEN (DoorStatus/Pulse Status=Open)")
                     self._turn_on_with_reset()
                 elif status == "Close":
                     _LOGGER.info("Door contact: CLOSED (DoorStatus/Pulse Status=Close)")
                     self._turn_off()
                 else:
-                    _LOGGER.debug("DoorStatus/Pulse with unknown Status=%r – ignored", status)
+                    _LOGGER.debug("DoorStatus/Pulse data=%s – ignored", event.data)
         elif event.code == "DoorOpen":
             _LOGGER.info("Door contact: OPEN (DoorOpen event)")
             self._turn_on_with_reset()
@@ -270,4 +286,39 @@ class DahuaMissedCallSensor(DahuaBaseBinarySensor):
             self._turn_on_with_reset()
         elif event.action == "Stop":
             _LOGGER.info("Missed call cleared by Stop event")
+            self._turn_off()
+
+
+class DahuaCallActiveSensor(DahuaBaseBinarySensor):
+    """Binary sensor: active call in progress ('Im Gespräch').
+
+    Turns ON when a VideoTalk event starts (indoor station ringing or call
+    connected). Turns OFF when VideoTalk stops or when CallNoAnswered fires
+    (nobody picked up). Auto-resets after 5 minutes as a safety fallback in
+    case the Stop event is never received.
+
+    Note: On GOLIATH firmware the device emits CallNoAnswered instead of
+    VideoTalk for unanswered calls; VideoTalk may only appear when a SIP
+    client actually connects.
+    """
+
+    _auto_reset_delay = _CALL_ACTIVE_RESET_DELAY
+
+    def __init__(self, coordinator: DahuaCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_call_active"
+        self._attr_translation_key = "call_active"
+
+    @callback
+    def _handle_event(self, event: DahuaEvent) -> None:
+        if event.code == "VideoTalk":
+            if event.action in ("Start", "Pulse", "On", "Active"):
+                _LOGGER.info("Call active (VideoTalk %s)", event.action)
+                self._turn_on_with_reset()
+            elif event.action in ("Stop", "Off", "Inactive"):
+                _LOGGER.info("Call ended (VideoTalk %s)", event.action)
+                self._turn_off()
+        elif event.code == "CallNoAnswered" and event.action == "Start":
+            # Unanswered – call attempt is over, not "in progress"
+            _LOGGER.info("Call ended unanswered – clearing call_active sensor")
             self._turn_off()

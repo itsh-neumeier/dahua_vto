@@ -18,8 +18,9 @@ from .models import DahuaEvent
 
 _LOGGER = logging.getLogger(__name__)
 
-# Same codes/actions as event.py doorbell detection
-_DOORBELL_CODES = {"BackKeyLight", "RingBell", "VideoTalk"}
+# Same codes/actions as event.py / binary_sensor.py doorbell detection.
+# CallNoAnswered is the GOLIATH firmware event for a button press.
+_DOORBELL_CODES = {"BackKeyLight", "RingBell", "VideoTalk", "CallNoAnswered"}
 _DOORBELL_ACTIONS = {"Start", "Pulse", "On", "Active"}
 
 # HA bus event fired once the snapshot is ready (for use in notification automations)

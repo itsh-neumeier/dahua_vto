@@ -258,6 +258,53 @@ class DahuaCoordinator:
             )
 
     # ------------------------------------------------------------------
+    # User ID helpers
+    # ------------------------------------------------------------------
+
+    def _next_user_id(self) -> str:
+        """Return the next available numeric UserID (max existing + 1, min 1001).
+
+        Used when registering a new person without an explicit ID.
+        """
+        existing = [int(uid) for uid in self.user_map if uid.isdigit()]
+        return str(max(existing, default=1000) + 1)
+
+    def _resolve_user_id(self, user_id: str | None, user_name: str | None) -> str | None:
+        """Return a UserID to use for card / fingerprint registration.
+
+        Resolution order:
+        1. Use ``user_id`` directly if provided.
+        2. Look up ``user_name`` in the current user_map (case-insensitive).
+        3. Auto-generate the next available numeric UserID.
+
+        Returns None only when neither user_id nor user_name is given
+        (= anonymous learn / no registration desired).
+        """
+        if user_id:
+            return user_id
+        if not user_name:
+            return None
+        # Reverse lookup: name → existing ID
+        name_lower = user_name.strip().lower()
+        found_id = next(
+            (uid for uid, nm in self.user_map.items() if nm.lower() == name_lower),
+            None,
+        )
+        if found_id:
+            _LOGGER.debug(
+                "DahuaVTO [%s]: Resolved user '%s' → existing UserID %s",
+                self.entry_id, user_name, found_id,
+            )
+            return found_id
+        # New person – generate next ID
+        new_id = self._next_user_id()
+        _LOGGER.info(
+            "DahuaVTO [%s]: Auto-generated UserID %s for new user '%s'",
+            self.entry_id, new_id, user_name,
+        )
+        return new_id
+
+    # ------------------------------------------------------------------
     # Card learning mode
     # ------------------------------------------------------------------
 
@@ -271,11 +318,13 @@ class DahuaCoordinator:
 
         When the next RFID/IC card is presented to the reader, a
         'dahua_vto_card_learned' event is fired on the HA bus with the card
-        number.  If `user_id` is given the card is also registered on the
-        device for that user (creates the user if `user_name` is supplied).
+        number.  The card is then registered on the device for the resolved
+        user (see _resolve_user_id).  Providing only user_name is enough –
+        the integration will find the existing UserID or create a new one.
         """
+        resolved_id = self._resolve_user_id(user_id, user_name)
         self._card_learning = True
-        self._card_learning_user_id = user_id
+        self._card_learning_user_id = resolved_id
         self._card_learning_user_name = user_name
         _LOGGER.info(
             "DahuaVTO [%s]: Card learning mode active (%ds, user=%s)",
@@ -347,7 +396,7 @@ class DahuaCoordinator:
 
     async def start_fingerprint_enrollment(
         self,
-        user_id: str,
+        user_id: str | None = None,
         user_name: str = "",
         finger_index: int = 0,
         poll_interval: float = 2.0,
@@ -355,20 +404,32 @@ class DahuaCoordinator:
     ) -> None:
         """Start fingerprint enrollment on the device.
 
+        Providing only user_name is sufficient – the integration resolves an
+        existing UserID or auto-generates a new one (see _resolve_user_id).
+
         Workflow:
-        1. Optionally create the user if user_name is given.
-        2. Tell the device to start enrollment for user_id / finger_index.
-        3. Poll enrollment status every `poll_interval` seconds.
-        4. Fire 'dahua_vto_fingerprint_enrolled' or 'dahua_vto_fingerprint_failed'
+        1. Resolve / generate a UserID.
+        2. Create the user record if user_name is given and user is new.
+        3. Tell the device to start enrollment for user_id / finger_index.
+        4. Poll enrollment status every `poll_interval` seconds.
+        5. Fire 'dahua_vto_fingerprint_enrolled' or 'dahua_vto_fingerprint_failed'
            on the HA bus when done (or timed out).
         """
+        resolved_id = self._resolve_user_id(user_id, user_name or None)
+        if not resolved_id:
+            _LOGGER.error(
+                "DahuaVTO [%s]: enroll_fingerprint requires user_id or user_name",
+                self.entry_id,
+            )
+            return
+
         # Cancel any ongoing enrollment first
         if self._fp_enroll_task and not self._fp_enroll_task.done():
             self._fp_enroll_task.cancel()
 
         self._fp_enroll_task = self.hass.async_create_task(
             self._run_fingerprint_enrollment(
-                user_id=user_id,
+                user_id=resolved_id,
                 user_name=user_name,
                 finger_index=finger_index,
                 poll_interval=poll_interval,

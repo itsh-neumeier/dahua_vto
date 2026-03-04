@@ -57,6 +57,9 @@
       },
       "missed_call": {
         "name": "Missed call"
+      },
+      "call_active": {
+        "name": "Call active"
       }
     },
     "button": {

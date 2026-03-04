@@ -57,6 +57,9 @@
       },
       "missed_call": {
         "name": "Anruf unbeantwortet"
+      },
+      "call_active": {
+        "name": "Im Gespräch"
       }
     },
     "button": {

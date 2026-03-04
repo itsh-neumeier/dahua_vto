@@ -3,7 +3,7 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![HA Version](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg)](https://www.home-assistant.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.10.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
+[![Version](https://img.shields.io/badge/Version-1.11.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
 
 > 🇬🇧 English documentation: [README.md](README.md)
 
@@ -35,6 +35,7 @@ Vollständige Home Assistant Integration für **GOLIATH / Dahua VTO** Türsprech
 | `binary_sensor` | Anruf unbeantwortet | Immer |
 | `binary_sensor` | Im Gespräch | Immer |
 | `button` | Tür öffnen | Immer |
+| `lock` | Türschloss | Immer (Entsperren = Relais-Impuls, 5 s Auto-Reset) |
 | `sensor` | Letzter Zugang | Immer |
 | `camera` | Türkamera | Immer (RTSP) |
 | `image` | Türkamera Snapshot | Auto-Update bei Klingeln |
@@ -50,6 +51,10 @@ Vollständige Home Assistant Integration für **GOLIATH / Dahua VTO** Türsprech
 | `dahua_vto.enroll_fingerprint` | Fingerabdruck-Einlernvorgang starten |
 | `dahua_vto.cancel_enrollment` | Laufenden Einlernvorgang abbrechen |
 | `dahua_vto.list_users` | Alle Benutzer vom Gerät laden (löst `dahua_vto_users_listed` aus) |
+| `dahua_vto.call_room` | Video-Anruf zur VTH-Innenstation starten |
+| `dahua_vto.stop_call` | Laufenden Anruf beenden |
+| `dahua_vto.trigger_alarm` | Alarmausgang ein-/ausschalten (mit optionaler Auto-Stop-Dauer) |
+| `dahua_vto.get_logs` | Ereignisprotokoll abrufen (löst `dahua_vto_logs_fetched` aus) |
 
 > **Tipp:** Bei `learn_card` und `enroll_fingerprint` genügt die Angabe von `user_name`. Die Integration ermittelt automatisch die passende UserID oder generiert eine neue.
 
@@ -62,6 +67,7 @@ Vollständige Home Assistant Integration für **GOLIATH / Dahua VTO** Türsprech
 | `dahua_vto_fingerprint_failed` | Einlernvorgang fehlgeschlagen / Timeout |
 | `dahua_vto_doorbell_snapshot` | Snapshot bereit nach Klingeln |
 | `dahua_vto_users_listed` | Benutzerliste abgerufen |
+| `dahua_vto_logs_fetched` | Protokolleinträge via `get_logs`-Dienst abgerufen |
 
 ---
 
@@ -203,6 +209,7 @@ automation:
 
 | Version | Änderungen |
 |---|---|
+| **1.11.0** | Neue Lock-Entität (Türrelais als HA-Schloss, 5 s Auto-Reset), neue Dienste: `call_room`, `stop_call`, `trigger_alarm` (mit Auto-Stop-Dauer), `get_logs` (In-Memory + RPC2-Log, löst `dahua_vto_logs_fetched` aus) |
 | **1.10.0** | Snapshot-Fix (CallNoAnswered in image.py), Türkontakt via Relay=true (8s Auto-Reset), neuer „Im Gespräch"-Binärsensor, automatische UserID-Auflösung per Name für Karten-/Fingerabdruck-Dienste |
 | **1.9.0** | Zweisprachig DE/EN via HA-Übersetzungssystem, HACS-Dokumentation, Sicherheitsverbesserungen (URL-Sanitierung), NumberSelector BOX statt Schieberegler |
 | **1.8.0** | Mehrzeiliger JSON-Stream-Parser, DoorStatus Pulse-Behandlung |

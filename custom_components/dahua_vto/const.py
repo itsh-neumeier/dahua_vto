@@ -14,7 +14,7 @@ DEFAULT_USERNAME = "admin"
 DEFAULT_NAME = "DahuaVTO"
 
 # Platforms
-PLATFORMS = ["event", "binary_sensor", "button", "camera", "sensor", "image"]
+PLATFORMS = ["event", "binary_sensor", "button", "camera", "sensor", "image", "lock"]
 
 # Event codes to subscribe to
 EVENT_CODES = [

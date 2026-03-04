@@ -27,6 +27,10 @@ SERVICE_DELETE_CARD = "delete_card"
 SERVICE_ENROLL_FINGERPRINT = "enroll_fingerprint"
 SERVICE_CANCEL_ENROLLMENT = "cancel_enrollment"
 SERVICE_LIST_USERS = "list_users"
+SERVICE_CALL_ROOM = "call_room"
+SERVICE_STOP_CALL = "stop_call"
+SERVICE_TRIGGER_ALARM = "trigger_alarm"
+SERVICE_GET_LOGS = "get_logs"
 
 # ------------------------------------------------------------------ #
 # Service schemas                                                      #
@@ -75,6 +79,43 @@ SCHEMA_ENROLL_FINGERPRINT = vol.Schema(
 )
 
 SCHEMA_ENTRY_ONLY = vol.Schema({_ENTRY_ID: cv.string})
+
+SCHEMA_CALL_ROOM = vol.Schema(
+    {
+        _ENTRY_ID: cv.string,
+        vol.Required("room_no"): cv.string,
+    }
+)
+
+SCHEMA_STOP_CALL = vol.Schema(
+    {
+        _ENTRY_ID: cv.string,
+        vol.Optional("room_no", default=""): cv.string,
+    }
+)
+
+SCHEMA_TRIGGER_ALARM = vol.Schema(
+    {
+        _ENTRY_ID: cv.string,
+        vol.Optional("channel", default=1): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=8)
+        ),
+        vol.Optional("active", default=True): cv.boolean,
+        vol.Optional("duration", default=0): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=3600)
+        ),
+    }
+)
+
+SCHEMA_GET_LOGS = vol.Schema(
+    {
+        _ENTRY_ID: cv.string,
+        vol.Optional("count", default=20): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=100)
+        ),
+        vol.Optional("source", default="both"): vol.In(["device", "memory", "both"]),
+    }
+)
 
 
 def _get_coordinator(hass: HomeAssistant, call: ServiceCall) -> DahuaCoordinator:
@@ -170,6 +211,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_ENROLL_FINGERPRINT,
             SERVICE_CANCEL_ENROLLMENT,
             SERVICE_LIST_USERS,
+            SERVICE_CALL_ROOM,
+            SERVICE_STOP_CALL,
+            SERVICE_TRIGGER_ALARM,
+            SERVICE_GET_LOGS,
         ):
             hass.services.async_remove(DOMAIN, svc)
 
@@ -294,6 +339,60 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, SERVICE_LIST_USERS, handle_list_users, schema=SCHEMA_ENTRY_ONLY
+    )
+
+    # ------------------------------------------------------------------
+    # Call / Alarm / Log services
+    # ------------------------------------------------------------------
+
+    async def handle_call_room(call: ServiceCall) -> None:
+        """Initiate a video call to a VTH indoor unit."""
+        coord = _get_coordinator(hass, call)
+        room_no = call.data["room_no"]
+        ok = await coord.call_room(room_no)
+        if ok:
+            _LOGGER.info("DahuaVTO: calling room %s", room_no)
+        else:
+            _LOGGER.warning("DahuaVTO: call_room %s may have failed", room_no)
+
+    async def handle_stop_call(call: ServiceCall) -> None:
+        """Hang up an active video call."""
+        coord = _get_coordinator(hass, call)
+        room_no = call.data.get("room_no", "")
+        ok = await coord.stop_call(room_no)
+        if ok:
+            _LOGGER.info("DahuaVTO: call stopped")
+        else:
+            _LOGGER.warning("DahuaVTO: stop_call may have failed")
+
+    async def handle_trigger_alarm(call: ServiceCall) -> None:
+        """Switch an alarm output on or off, with optional auto-stop."""
+        coord = _get_coordinator(hass, call)
+        await coord.trigger_alarm(
+            channel=call.data.get("channel", 1),
+            active=call.data.get("active", True),
+            duration=call.data.get("duration", 0),
+        )
+
+    async def handle_get_logs(call: ServiceCall) -> None:
+        """Fetch recent events and fire 'dahua_vto_logs_fetched' on the HA bus."""
+        coord = _get_coordinator(hass, call)
+        await coord.get_logs(
+            count=call.data.get("count", 20),
+            source=call.data.get("source", "both"),
+        )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_CALL_ROOM, handle_call_room, schema=SCHEMA_CALL_ROOM
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_STOP_CALL, handle_stop_call, schema=SCHEMA_STOP_CALL
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_TRIGGER_ALARM, handle_trigger_alarm, schema=SCHEMA_TRIGGER_ALARM
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_GET_LOGS, handle_get_logs, schema=SCHEMA_GET_LOGS
     )
 
     _LOGGER.debug("DahuaVTO: services registered")

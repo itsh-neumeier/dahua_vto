@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import deque
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -25,6 +27,10 @@ _LOGGER = logging.getLogger(__name__)
 EVENT_CARD_LEARNED = "dahua_vto_card_learned"
 EVENT_FP_ENROLLED = "dahua_vto_fingerprint_enrolled"
 EVENT_FP_FAILED = "dahua_vto_fingerprint_failed"
+EVENT_LOGS_FETCHED = "dahua_vto_logs_fetched"
+
+# How many events to keep in the in-memory log
+_EVENT_LOG_MAX = 100
 
 # Fingerprint enrollment status codes returned by the device
 _FP_STATUS_IDLE = {"0", "idle"}
@@ -74,6 +80,12 @@ class DahuaCoordinator:
         # UserID → UserName mapping (loaded at startup, refreshed on reconnect)
         self.user_map: dict[str, str] = {}
 
+        # Rolling in-memory event log (last _EVENT_LOG_MAX events)
+        self._event_log: deque[dict] = deque(maxlen=_EVENT_LOG_MAX)
+
+        # Alarm auto-stop task
+        self._alarm_stop_task: asyncio.Task | None = None
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
@@ -93,6 +105,8 @@ class DahuaCoordinator:
         self._card_learning = False
         if self._fp_enroll_task and not self._fp_enroll_task.done():
             self._fp_enroll_task.cancel()
+        if self._alarm_stop_task and not self._alarm_stop_task.done():
+            self._alarm_stop_task.cancel()
         self._stop_event.set()
         if self._stream_task and not self._stream_task.done():
             self._stream_task.cancel()
@@ -191,6 +205,20 @@ class DahuaCoordinator:
 
     async def _on_event(self, event: DahuaEvent) -> None:
         """Called for every parsed event from the stream."""
+        # Append to in-memory event log
+        self._event_log.append(
+            {
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "code": event.code,
+                "action": event.action,
+                "index": event.index,
+                "data": event.data,
+                "user_id": event.user_id,
+                "user_name": self.user_map.get(str(event.user_id), ""),
+                "card_no": event.card_no,
+            }
+        )
+
         # Check card learning mode BEFORE dispatching to entities
         if self._card_learning and event.code == "AccessControl":
             method = event.access_method
@@ -389,6 +417,91 @@ class DahuaCoordinator:
         self._card_learning = False
         self._card_learning_user_id = None
         self._card_learning_user_name = None
+
+    # ------------------------------------------------------------------
+    # Alarm control
+    # ------------------------------------------------------------------
+
+    async def trigger_alarm(
+        self, channel: int = 1, active: bool = True, duration: int = 0
+    ) -> None:
+        """Switch alarm output on/off with optional auto-stop after `duration` seconds."""
+        # Cancel previous auto-stop if any
+        if self._alarm_stop_task and not self._alarm_stop_task.done():
+            self._alarm_stop_task.cancel()
+            self._alarm_stop_task = None
+
+        await self.client.trigger_alarm(channel=channel, active=active)
+
+        if active and duration > 0:
+            async def _auto_stop() -> None:
+                await asyncio.sleep(duration)
+                _LOGGER.info(
+                    "DahuaVTO [%s]: Alarm auto-stop after %ds", self.entry_id, duration
+                )
+                await self.client.trigger_alarm(channel=channel, active=False)
+
+            self._alarm_stop_task = self.hass.async_create_task(_auto_stop())
+
+    # ------------------------------------------------------------------
+    # Call control
+    # ------------------------------------------------------------------
+
+    async def call_room(self, room_no: str) -> bool:
+        """Call a VTH indoor unit by room number."""
+        return await self.client.call_room(room_no)
+
+    async def stop_call(self, room_no: str = "") -> bool:
+        """Hang up an active call."""
+        return await self.client.stop_call(room_no)
+
+    # ------------------------------------------------------------------
+    # Log retrieval
+    # ------------------------------------------------------------------
+
+    async def get_logs(self, count: int = 20, source: str = "both") -> None:
+        """Fetch logs and fire 'dahua_vto_logs_fetched' on the HA bus.
+
+        Parameters
+        ----------
+        count:  Number of log entries to return.
+        source: "device"  – device-side RPC2 log only
+                "memory"  – in-memory event log only
+                "both"    – merge device + memory logs (default)
+        """
+        device_records: list[dict] = []
+        memory_records: list[dict] = list(self._event_log)[-count:]
+
+        if source in ("device", "both"):
+            try:
+                device_records = await self.client.get_access_logs(count=count)
+            except Exception as exc:
+                _LOGGER.debug(
+                    "DahuaVTO [%s]: get_access_logs device query failed: %s",
+                    self.entry_id, exc,
+                )
+
+        if source == "device":
+            records = device_records
+        elif source == "memory":
+            records = memory_records
+        else:
+            # Merge: device records first (older), memory records last (newer)
+            records = device_records + memory_records
+
+        self.hass.bus.async_fire(
+            EVENT_LOGS_FETCHED,
+            {
+                "entry_id": self.entry_id,
+                "count": len(records),
+                "records": records[-count:],  # cap at requested count
+                "source": source,
+            },
+        )
+        _LOGGER.info(
+            "DahuaVTO [%s]: get_logs fired %d records (source=%s)",
+            self.entry_id, len(records), source,
+        )
 
     # ------------------------------------------------------------------
     # Fingerprint enrollment

@@ -176,3 +176,121 @@ list_users:
       required: false
       selector:
         text:
+
+call_room:
+  name: Anruf starten
+  description: >
+    Startet einen Video-Anruf zur angegebenen VTH-Innenstation (Raumnummer).
+    Feuert keinen eigenen HA-Event – der aktive Anruf wird über den
+    'Im Gespräch'-Sensor sichtbar.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+    room_no:
+      name: Raumnummer
+      description: >
+        VTH-Raumnummer, die angerufen werden soll (z. B. "8020").
+        Die Raumnummern sind in der Gerätekonfiguration hinterlegt.
+      required: true
+      selector:
+        text:
+
+stop_call:
+  name: Anruf beenden
+  description: >
+    Beendet einen laufenden Video-Anruf. Optional kann die Raumnummer der
+    Innenstation angegeben werden.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+    room_no:
+      name: Raumnummer (optional)
+      description: VTH-Raumnummer (optional – ohne Angabe wird der aktive Anruf beendet).
+      required: false
+      selector:
+        text:
+
+trigger_alarm:
+  name: Alarm schalten
+  description: >
+    Schaltet einen Alarmausgang-Kanal ein oder aus. Optional kann eine
+    Dauer angegeben werden – nach Ablauf wird der Alarm automatisch gestoppt.
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+    channel:
+      name: Kanal
+      description: Alarmausgang-Kanal (Standard: 1).
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 8
+          step: 1
+    active:
+      name: Aktiv
+      description: "true = Alarm ein, false = Alarm aus (Standard: true)."
+      required: false
+      default: true
+      selector:
+        boolean:
+    duration:
+      name: Dauer (Sekunden)
+      description: >
+        Automatisch stoppen nach dieser Zeit (0 = kein Auto-Stop, Standard: 0).
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 3600
+          step: 5
+          unit_of_measurement: s
+
+get_logs:
+  name: Ereignisprotokoll abrufen
+  description: >
+    Gibt die letzten Ereignisse aus. Feuert das HA-Ereignis
+    'dahua_vto_logs_fetched' mit allen Einträgen. Quellen: 'device' (Gerät
+    via RPC2), 'memory' (HA-interner Puffer) oder 'both' (beide, Standard).
+  fields:
+    entry_id:
+      name: Geräte-ID
+      description: Config-Entry-ID (optional).
+      required: false
+      selector:
+        text:
+    count:
+      name: Anzahl Einträge
+      description: Maximale Anzahl zurückgegebener Log-Einträge (Standard: 20).
+      required: false
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+    source:
+      name: Quelle
+      description: "'device', 'memory' oder 'both' (Standard: both)."
+      required: false
+      default: both
+      selector:
+        select:
+          options:
+            - device
+            - memory
+            - both

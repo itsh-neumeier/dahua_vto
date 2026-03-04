@@ -708,6 +708,133 @@ class DahuaClient:
             return False
 
     # ------------------------------------------------------------------
+    # Call / Alarm API
+    # ------------------------------------------------------------------
+
+    async def call_room(self, room_no: str) -> bool:
+        """Initiate a video call to a VTH indoor unit by room number.
+
+        Tries two known CGI endpoint patterns used across different
+        Dahua / GOLIATH firmware versions.
+        """
+        safe_room = _safe_id(room_no)
+        for path in (
+            f"/cgi-bin/IntervideoManager.cgi"
+            f"?action=Start&SessionName=Dahua_IPC&Command=Call&Room={safe_room}",
+            f"/cgi-bin/CallManager.cgi?action=startCall&RoomNo={safe_room}",
+        ):
+            try:
+                text = await self._get(path)
+                if "OK" in text or "true" in text.lower():
+                    _LOGGER.info("call_room %s: OK", safe_room)
+                    return True
+            except Exception as exc:
+                _LOGGER.debug("call_room path %s: %s", path, exc)
+        _LOGGER.error("call_room: no working endpoint found for room %s", room_no)
+        return False
+
+    async def stop_call(self, room_no: str = "") -> bool:
+        """Hang up an active video call."""
+        safe_room = _safe_id(room_no) if room_no else ""
+        paths = []
+        if safe_room:
+            paths.append(
+                f"/cgi-bin/IntervideoManager.cgi"
+                f"?action=Stop&SessionName=Dahua_IPC&Command=Call&Room={safe_room}"
+            )
+        paths.append(
+            "/cgi-bin/IntervideoManager.cgi"
+            "?action=Stop&SessionName=Dahua_IPC&Command=Call"
+        )
+        for path in paths:
+            try:
+                text = await self._get(path)
+                if "OK" in text or "true" in text.lower():
+                    _LOGGER.info("stop_call: OK")
+                    return True
+            except Exception as exc:
+                _LOGGER.debug("stop_call path %s: %s", path, exc)
+        return False
+
+    async def trigger_alarm(self, channel: int = 1, active: bool = True) -> bool:
+        """Switch an alarm output relay on (active=True) or off (active=False).
+
+        Supported by most Dahua VTO devices via the alarmManager CGI.
+        """
+        action_val = "1" if active else "0"
+        path = (
+            f"/cgi-bin/alarmManager.cgi"
+            f"?action=setAlarmOut&Channel={channel}&Action={action_val}"
+        )
+        try:
+            text = await self._get(path)
+            ok = "OK" in text or "true" in text.lower()
+            _LOGGER.info(
+                "trigger_alarm ch=%d active=%s → %s", channel, active, text.strip()
+            )
+            return ok
+        except Exception as exc:
+            _LOGGER.error("trigger_alarm failed: %s", exc)
+            return False
+
+    async def get_access_logs(self, count: int = 20) -> list[dict]:
+        """Fetch recent access log entries from the device via RPC2 (best-effort).
+
+        Tries RecordFinder (AccessControlLog) first, then LogServer.getMlogList.
+        Returns an empty list if both fail (coordinator in-memory log is the
+        reliable fallback).
+        """
+        # --- Attempt 1: RecordFinder for AccessControlLog ------------------
+        try:
+            start = await self._rpc2_call(
+                "RecordFinder.startFind",
+                {"Name": "AccessControlLog", "Condition": {}},
+            )
+            if start.get("result"):
+                token = start["params"]["Token"]
+                total = start["params"].get("Total", 0)
+                records: list[dict] = []
+                try:
+                    offset = max(0, total - count)
+                    do = await self._rpc2_call(
+                        "RecordFinder.doFind",
+                        {"Token": token, "Offset": offset, "Count": count},
+                    )
+                    if do.get("result"):
+                        records = do.get("params", {}).get("Records", [])
+                finally:
+                    try:
+                        await self._rpc2_call(
+                            "RecordFinder.stopFind", {"Token": token}
+                        )
+                    except Exception:
+                        pass
+                if records:
+                    _LOGGER.debug(
+                        "get_access_logs: %d records via RecordFinder", len(records)
+                    )
+                    return records
+        except Exception as exc:
+            _LOGGER.debug("get_access_logs RecordFinder failed: %s", exc)
+
+        # --- Attempt 2: LogServer.getMlogList -------------------------------
+        try:
+            result = await self._rpc2_call(
+                "LogServer.getMlogList",
+                {"Condition": {}, "Offset": 0, "Count": count},
+            )
+            if result.get("result"):
+                records = result.get("params", {}).get("Records", [])
+                _LOGGER.debug(
+                    "get_access_logs: %d records via LogServer", len(records)
+                )
+                return records
+        except Exception as exc:
+            _LOGGER.debug("get_access_logs LogServer failed: %s", exc)
+
+        return []
+
+    # ------------------------------------------------------------------
     # Event Stream
     # ------------------------------------------------------------------
 

@@ -81,6 +81,11 @@
       "door_snapshot": {
         "name": "Türkamera Snapshot"
       }
+    },
+    "lock": {
+      "door_lock": {
+        "name": "Türschloss"
+      }
     }
   }
 }

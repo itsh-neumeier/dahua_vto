@@ -713,27 +713,59 @@ actions:
       source: memory
 ```
 
-#### Persistente Benachrichtigung mit letztem Log-Eintrag
+#### Letzte 20 Einträge als persistente Benachrichtigung
 
 ```yaml
-alias: "Protokoll – Letzten Eintrag anzeigen"
-description: "Persistente Benachrichtigung nach Log-Abruf mit letztem Eintrag"
+alias: "Protokoll – Letzte 20 Einträge anzeigen"
+description: "Zeigt die letzten 20 Zugänge als persistente Benachrichtigung mit Klartextübersetzungen"
 mode: single
 triggers:
   - trigger: event
     event_type: dahua_vto_logs_fetched
-conditions:
-  - condition: template
-    value_template: "{{ trigger.event.data.count > 0 }}"
+conditions: []
 actions:
-  - action: notify.persistent_notification
+  - action: persistent_notification.create
     data:
-      title: "DahuaVTO – Zugriffsprotokoll ({{ trigger.event.data.count }} Einträge)"
+      title: "Letzte {{ trigger.event.data.count }} Einträge"
+      notification_id: dahua_vto_logs
       message: >
-        {% set last = trigger.event.data.records | last %}
-        Letzter Eintrag: {{ last.timestamp }}
-        – {{ last.code }}/{{ last.action }}
-        {% if last.user_name %} ({{ last.user_name }}){% endif %}
+        {% set records = trigger.event.data.records %}
+
+        {% set methoden = {
+          '0':           'Karte',
+          '1':           'PIN',
+          '6':           'Fingerabdruck',
+          '128':         'Gesicht',
+          'card':        'Karte',
+          'pin':         'PIN',
+          'fingerprint': 'Fingerabdruck',
+          'face':        'Gesicht',
+          'button':      'HA Button',
+          'lock':        'HA Schloss',
+          'ha':          'HomeAssistant'
+        } %}
+
+        {% set codes = {
+          'AccessControl':  'Zugang',
+          'DoorStatus':     'Tuerstatus',
+          'DoorUnlock':     'Tuer geoeffnet',
+          'CallNoAnswered': 'Klingeln',
+          'RingBell':       'Klingeln',
+          'VideoTalk':      'Anruf',
+          'AlarmLocal':     'Alarm'
+        } %}
+
+        {% for r in records | reverse %}
+        {{ r.timestamp }}
+        {{ codes.get(r.code, r.code) }}
+        {%- if r.user_name and r.user_name != 'HomeAssistant' %}  –  {{ r.user_name }}{% endif %}
+        {%- set m_raw = r.data.get('Method', r.data.get('source', '')) | string %}
+        {%- set methode = methoden.get(m_raw, '') %}
+        {%- if methode %}  |  {{ methode }}{% endif %}
+        {%- if r.card_no and methode != 'Fingerabdruck' %}
+        Karte: {{ r.card_no }}{% endif %}
+        -----------------
+        {% endfor %}
 ```
 
 ---

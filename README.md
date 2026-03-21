@@ -3,7 +3,7 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![HA Version](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg)](https://www.home-assistant.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.14.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
+[![Version](https://img.shields.io/badge/Version-1.14.1-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
 
 > 🇩🇪 Deutsche Dokumentation: [README.de.md](README.de.md)
 
@@ -111,6 +111,17 @@ The config flow detects all modules automatically:
 ---
 
 ### 🔔 Doorbell
+
+#### Blueprint: push notification with snapshot photo
+
+Import this blueprint into Home Assistant and create the automation from the UI:
+`https://raw.githubusercontent.com/itsh-neumeier/dahua_vto/main/blueprints/automation/dahua_vto/doorbell_push_notification_snapshot.yaml`
+
+The blueprint lets you configure:
+- the mobile app notification service
+- custom title and message
+- an optional doorbell button filter
+- an optional click action and notification tag
 
 #### Push notification with snapshot photo
 
@@ -812,6 +823,7 @@ actions:
 
 | Version | Changes |
 |---|---|
+| **1.14.1** | Add importable Home Assistant blueprint for doorbell push notifications with snapshot photo and document it in the README |
 | **1.14.0** | New `image` entity `access_snapshot`: auto-fetches camera snapshot on every granted access (card/fingerprint/face/PIN), fires `dahua_vto_access_snapshot` with `user_id`, `user_name`, `card_no`, `method` – usable in push notification automations with inline photo |
 | **1.13.0** | Fix device log retrieval: correct RecordFinder API (`factory.create` → object-based calls, record types `AccessControlCardRec` / `VideoTalkLog`). New `log_type` param for `get_logs` service (`access` / `call` / `all`). HAR analysis confirmed 887 call logs + 1000 access logs on device. |
 | **1.12.0** | Door unlock logging: `lock.unlock` and `button.open_door` now write an explicit `DoorUnlock` entry (with source `lock`/`button`) to the in-memory log – visible in `get_logs` output |

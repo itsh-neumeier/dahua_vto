@@ -1,0 +1,76 @@
+blueprint:
+  name: Dahua VTO - Doorbell push notification with snapshot
+  description: Send a mobile push notification when a doorbell snapshot is available.
+  domain: automation
+  source_url: https://github.com/itsh-neumeier/dahua_vto/blob/main/blueprints/automation/dahua_vto/doorbell_push_notification_snapshot.yaml
+  input:
+    notify_service:
+      name: Notification service
+      description: Mobile app notification service, for example notify.mobile_app_my_phone.
+      selector:
+        text:
+    title:
+      name: Notification title
+      description: Title shown in the push notification.
+      default: Someone at the door!
+      selector:
+        text:
+    message:
+      name: Notification message
+      description: Message shown in the push notification.
+      default: Doorbell was pressed
+      selector:
+        text:
+    button_number:
+      name: Doorbell button filter
+      description: Use 0 for all buttons, or set a specific button number.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 20
+          mode: box
+    click_action:
+      name: Click action
+      description: Optional Home Assistant path or URL opened when tapping the notification.
+      default: /lovelace
+      selector:
+        text:
+    notification_tag:
+      name: Notification tag
+      description: Optional tag used to replace older notifications from the same doorbell.
+      default: dahua_vto_doorbell
+      selector:
+        text:
+
+mode: single
+
+variables:
+  doorbell_button: !input button_number
+
+triggers:
+  - trigger: event
+    event_type: dahua_vto_doorbell_snapshot
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ doorbell_button | int(0) == 0 or trigger.event.data.button | int(0) == doorbell_button | int(0) }}
+
+actions:
+  - variables:
+      image_entity_id: "{{ trigger.event.data.entity_id }}"
+      selected_click_action: !input click_action
+      selected_tag: !input notification_tag
+  - action: !input notify_service
+    data:
+      title: !input title
+      message: !input message
+      data:
+        image: "/api/image_proxy/{{ image_entity_id }}"
+        clickAction: >-
+          {%- if selected_click_action | trim -%}{{ selected_click_action }}{%- endif -%}
+        url: >-
+          {%- if selected_click_action | trim -%}{{ selected_click_action }}{%- endif -%}
+        tag: >-
+          {%- if selected_tag | trim -%}{{ selected_tag }}{%- endif -%}

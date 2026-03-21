@@ -3,7 +3,7 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![HA Version](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg)](https://www.home-assistant.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.14.0-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
+[![Version](https://img.shields.io/badge/Version-1.14.1-brightgreen.svg)](https://github.com/itsh-neumeier/dahua_vto/releases)
 
 > 🇬🇧 English documentation: [README.md](README.md)
 
@@ -111,6 +111,17 @@ Der Konfigurationsassistent erkennt alle Module automatisch:
 ---
 
 ### 🔔 Klingel
+
+#### Blueprint: Push-Benachrichtigung mit Foto
+
+Dieses Blueprint in Home Assistant importieren und die Automation anschließend im UI anlegen:
+`https://raw.githubusercontent.com/itsh-neumeier/dahua_vto/main/blueprints/automation/dahua_vto/doorbell_push_notification_snapshot.yaml`
+
+Das Blueprint bietet folgende Optionen:
+- den Mobile-App-Benachrichtigungsdienst
+- eigenen Titel und Nachricht
+- optionalen Filter auf eine bestimmte Klingeltaste
+- optionale Click-Action und Notification-Tag
 
 #### Push-Benachrichtigung mit Foto
 
@@ -812,6 +823,7 @@ actions:
 
 | Version | Änderungen |
 |---|---|
+| **1.14.1** | Importierbares Home-Assistant-Blueprint für Klingel-Push-Benachrichtigungen mit Snapshot-Foto ergänzt und im README dokumentiert |
 | **1.14.0** | Neue `image`-Entität `zugangs_snapshot`: automatischer Kamera-Snapshot bei jedem gewährten Zugang (Karte/Fingerabdruck/Gesicht/PIN), löst `dahua_vto_access_snapshot` mit `user_id`, `user_name`, `card_no`, `method` aus – nutzbar in Push-Benachrichtigungs-Automationen mit Inline-Foto |
 | **1.13.0** | Geräte-Log-Abruf korrigiert: korrekter RecordFinder-API-Ablauf (`factory.create` → objektbasierte Aufrufe, Record-Typen `AccessControlCardRec` / `VideoTalkLog`). Neuer `log_type`-Parameter für `get_logs` (`access` / `call` / `all`). HAR-Analyse bestätigte 887 Anruf-Logs + 1000 Zugangs-Logs auf dem Gerät. |
 | **1.12.0** | Türöffnungs-Logging: `lock.unlock` und `button.open_door` schreiben jetzt einen expliziten `DoorUnlock`-Eintrag (mit Quelle `lock`/`button`) ins In-Memory-Log – sichtbar in der `get_logs`-Ausgabe |
